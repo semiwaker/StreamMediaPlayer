@@ -1,5 +1,5 @@
 import asyncio
-from asyncio.events import get_event_loop
+# from asyncio.events import get_event_loop
 import ctypes
 import sys
 
@@ -84,13 +84,13 @@ class Player(wx.Frame):
         #   File Menu
         self.frame_menubar = wx.MenuBar()
         self.file_menu = wx.Menu()
-        self.file_menu.Append(1, "&Open...", "Open from file...")
-        self.file_menu.AppendSeparator()
-        self.file_menu.Append(2, "&Close", "Quit")
-        AsyncBind(wx.EVT_MENU, self.OnOpen, id=1)
-        AsyncBind(wx.EVT_MENU, self.OnExit, id=2)
+        self.file_menu.Append(1, "&Open", "Open distant file")
+        # self.file_menu.AppendSeparator()
+        # self.file_menu.Append(2, "&Close", "Quit")
         self.frame_menubar.Append(self.file_menu, "File")
         self.SetMenuBar(self.frame_menubar)
+        AsyncBind(wx.EVT_MENU, self.OnOpen, self, id=1)
+        # AsyncBind(wx.EVT_MENU, self.OnExit, self, id=2)
 
         # Panels
         # The first panel holds the video and it's all black
@@ -141,25 +141,29 @@ class Player(wx.Frame):
         self.SetMinSize((350, 300))
 
         # finally create the timer, which updates the timeslider
-        StartCoroutine(self.onTimer, self)
+        StartCoroutine(self.OnTimer, self)
 
         # VLC player controls
         self.Instance = vlc.Instance()
         self.player = self.Instance.media_player_new()
 
+        print("Created")
+
     async def OnExit(self, evt):
         """Closes the window.
         """
+        print("Exit")
         self.running = False
         self.Close()
 
     async def OnOpen(self, evt):
         """Pop up a new dialow window to choose a file, then play the selected file.
         """
+        print("Open")
         # if a file is already running, then stop it.
         await self.OnStop(None)
 
-        choices = None
+        choices = await self.buffer.get_file_names()
         dialog = wx.SingleChoiceDialog(
             self,
             "Choose one file to play.",
@@ -203,13 +207,14 @@ class Player(wx.Frame):
         """Toggle the status to Play/Pause.
         If no file is loaded, open the dialog window.
         """
+        print("Play")
         # check if there is a file to play, otherwise open a
         # wx.FileDialog to select a file
         if not self.player.get_media():
             await self.OnOpen(None)
             # Try to launch the media, if this fails display an error message
         elif self.player.play():  # == -1:
-            await self.errorDialog("Unable to play.")
+            self.errorDialog("Unable to play.")
         else:
             # adjust window to video aspect ratio
             # w, h = self.player.video_get_size()
@@ -219,11 +224,12 @@ class Player(wx.Frame):
             self.play.Disable()
             self.pause.Enable()
             self.stop.Enable()
-            self.msg_queue.push({"type": "play"})
+            await self.msg_queue.put({"type": "play"})
 
     async def OnPause(self, evt):
         """Pause the player.
         """
+        print("Pause")
         if self.player.is_playing():
             self.play.Enable()
             self.pause.Disable()
@@ -231,24 +237,25 @@ class Player(wx.Frame):
         #     self.play.Disable()
         #     self.pause.Enable()
         self.player.pause()
-        self.msg_queue.push({"type": "pause"})
+        await self.msg_queue.put({"type": "pause"})
 
     async def OnStop(self, evt):
         """Stop the player.
         """
+        print("Stop")
         self.playing = False
         self.player.stop()
         # reset the time slider
         self.timeslider.SetValue(0)
-        self.timer.Stop()
         self.play.Enable()
         self.pause.Disable()
         self.stop.Disable()
-        self.msg_queue.push({"type": "stop"})
+        await self.msg_queue.put({"type": "stop"})
 
     async def OnTimer(self):
         """Update the time slider according to the current movie time.
         """
+        print("Timer")
         while self.running:
             if self.playing:
                 length = self.player.get_length()
@@ -263,6 +270,7 @@ class Player(wx.Frame):
     async def OnMute(self, evt):
         """Mute/Unmute according to the audio button.
         """
+        print("Mute")
         muted = self.player.audio_get_mute()
         self.player.audio_set_mute(not muted)
         self.mute.SetLabel("Mute" if muted else "Unmute")
@@ -274,12 +282,13 @@ class Player(wx.Frame):
     async def OnVolume(self, evt):
         """Set the volume according to the volume sider.
         """
+        print("Volume")
         volume = self.volslider.GetValue() * 2
         # vlc.MediaPlayer.audio_set_volume returns 0 if success, -1 otherwise
         if self.player.audio_set_volume(volume) == -1:
             self.errorDialog("Failed to set volume")
 
-    async def errorDialog(self, errormessage):
+    def errorDialog(self, errormessage):
         """Display a simple error dialog.
         """
         edialog = wx.MessageDialog(self, errormessage, 'Error', wx.OK |
@@ -288,10 +297,13 @@ class Player(wx.Frame):
 
 
 def createWindow(msg_queue, buffer, client_network_main):
-    loop = get_event_loop()
-    loop.createTask(client_network_main(msg_queue, buffer))
+    print("Creating Window")
+    loop = asyncio.get_event_loop()
+    loop.create_task(client_network_main(msg_queue, buffer))
     app = WxAsyncApp()
     player = Player("Stream Media Player", buffer, msg_queue)
     player.Show()
     app.SetTopWindow(player)
-    loop.run_until_complete(app.MainLoop)
+    print("Running")
+    loop.set_debug(True)
+    loop.run_until_complete(app.MainLoop())

@@ -15,6 +15,9 @@ class MediaBuffer:
         self.buf_lock = threading.Lock()
         self.cv = threading.Condition(self.buf_lock)
 
+    async def get_file_names(self):
+        return [""]
+
     def set_name(self, file_name):
         self.file_name = file_name
 
