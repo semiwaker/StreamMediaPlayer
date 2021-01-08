@@ -12,10 +12,15 @@ class MediaBuffer:
         self.interval = interval
         self.fetch_size = fetch_size
         self.file_name = ""
+        self.write = None
 
         self.buf_lock = threading.Lock()
         self.cv = threading.Condition(self.buf_lock)
 
+    def set_writer(writer):
+        self.writer = writer
+
+    
     async def get_file_names(self):
         return [""]
 

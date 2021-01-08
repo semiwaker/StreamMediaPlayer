@@ -12,18 +12,36 @@ async def client_network_main(msg_queue, buffer):
         host = socket.gethostname()
         port = 23333
     
-        local_server = ServerProtocol(loop, buffer)
-        client = ClientProtocol(loop, buffer, host, port)
+        # local_server = ServerProtocol(loop, buffer)
+        # client = ClientProtocol(loop, buffer, host, port)
 
-        async def server_main(local_server, loop, buffer):
-            await loop.create_server(local_server, host, port)
+        # async def server_main(local_server, loop, buffer):
+        #     await loop.create_server(local_server, host, port)
+        async def response(reader, writer):
+            while True:
+                msg = await reader.readline()
+                data_list[0] = msg
+                if data_list[1] == 'No':
+                    self.num_failure += 1
+                    if self.num_failure < 3:
+                        self.write_msg(last_msg[data_list[0]])   # 重发上一条同类信息
+                    else:
+                        # ???通知用户服务器拒绝访问
+                else:   
+                    self.num_failure = 0 
+                    if msg == 'list':
+                        file_num = int(data_list[1])
+                        file_list = data_list[2:]
+                        #  ???传回file_num, file_list
+
+
+        asyncio.start_server(response, host, port)
 
         v_server_host = '远程服务器hostname'
         v_server_port = 12345
 
-        async def client_main(client, v_host, v_buffer, loop, buffer):
-            await loop.create_connection(client, v_server_host, v_server_port)
-
+        v_reader, v_writer = await asyncio.open_connection(v_server_host, v_server_port)
+        buffer.set_writer(v_writer)
     
         async def process_msg(msg_queue):
             while True:
@@ -41,13 +59,12 @@ async def client_network_main(msg_queue, buffer):
             #     client.write_msg('end')
             # elif msg[0] == 'seek':
             #     client.write_msg(('seek ' + msg[1]))
-            client.write_msg(msg)
+                writer.write(msg.encode())
+        loop = asyncio.get_event_loop()
         tasks=[
-            server_main(local_server, loop, buffer), 
-            client_main(client, v_server_host, v_server_port, loop, buffer),
             process_msg(msg_queue)
         ]
-        await asyncio.gather(tasks)
+        loop.run_forever()
 
 
 
