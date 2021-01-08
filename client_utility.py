@@ -16,7 +16,7 @@ class MediaBuffer:
         self.buf_lock = threading.Lock()
         self.cv = threading.Condition(self.buf_lock)
 
-    def set_writer(writer):
+    def set_writer(self, writer):
         self.writer = writer
 
     async def get_file_names(self):
