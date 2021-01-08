@@ -5,13 +5,12 @@ import time
 
 
 class MediaBuffer:
-    def __init__(self, interval, max_size, fetch_size):
-        self.buf = [{'timestamp': 0, 'data': None}]
+    def __init__(self, max_size):
+        self.buf = [{'seq': -1, 'data': None}]
         self.cur = 0
         self.max_size = max_size
-        self.interval = interval
-        self.fetch_size = fetch_size
         self.file_name = ""
+        self.fetch_size = 8
         self.write = None
 
         self.buf_lock = threading.Lock()
@@ -20,7 +19,6 @@ class MediaBuffer:
     def set_writer(writer):
         self.writer = writer
 
-    
     async def get_file_names(self):
         return [""]
 
@@ -31,39 +29,31 @@ class MediaBuffer:
         # TODO: send open
         pass
 
-    def insert(self, timestamp, data):
+    def insert(self, seq, data):
         with self.buf_lock:
-            last_ts = self.buf[-1]['timestamp']
-            if last_ts < timestamp:
-                cnt = (timestamp - last_ts) / self.interval
+            last_ts = self.buf[-1]['seq']
+            if last_ts < seq:
                 self.buf += [
-                    {'timestamp': last_ts + i*self.interval, 'data': None}
-                    for i in range(1, cnt+1)
+                    {'seq': i, 'data': None}
+                    for i in range(last_ts+1, seq+1)
                 ]
-            first_ts = self.buf[0]['timestamp']
-            self.buf[(timestamp-first_ts)/self.interval]['data'] = data
+            first_ts = self.buf[0]['seq']
+            self.buf[seq-first_ts]['data'] = data
         if self.available():
             with self.cv:
                 self.cv.notify()
 
     def available(self):
-        for i in range(self.fetch_size):
-            if self.buf[self.cur+i]['data'] is not None:
-                return True
-        return False
+        return self.buf[self.cur+1]['data'] is not None
 
     def fetch(self):
         with self.cv:
             self.cv.wait_for(self.available)
 
-            data = None
-            while data is None:
-                self.cur = self.cur + 1
-                data = self.buf[self.cur]['data']
-                if data is None:
-                    threading.sleep(self.interval)
+            self.cur = self.cur + 1
+            data = self.buf[self.cur]['data']
 
-            if self.cur > 2*self.fetch_size:
+            if self.cur > self.fetch_size:
                 self.cur -= self.fetch_size
                 self.buf = self.buf[self.fetch_size:]
             return data
