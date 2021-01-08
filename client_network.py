@@ -39,49 +39,49 @@ async def client_network_main(msg_queue, buffer):
 
     v_reader, v_writer = await asyncio.open_connection(v_server_host, v_server_port)
     buffer.set_writer(v_writer)
+    burrer.set_reader(v_reader)
     v_writer.write('%s  %d' % (host, port).encode())
+    # process msg
+    while True:
+        msg = await msg_queue.get()
+        write_msg(msg)
 
-    async def process_msg():
-        msg = await v_reader.readline()
-        data_list = data.decode().split()
-        data_list[0] = msg
-        if data_list[1] == 'No':
-            num_failure += 1
-            if num_failure < 3:
-                write_msg(last_msg[data_list[0]])   # 重发上一条同类信息
-            else:
-                # ???通知用户服务器拒绝访问
-        else:
-            num_failure = 0
-            if msg == 'list':
-                file_num = int(data_list[1])
-                file_list = data_list[2:]
-                # ???传回file_num, file_list
-            elif msg == 'end':
-                # ???结束
+    # async def process_server_msg():
+    #     msg = await v_reader.readline()
+    #     data_list = data.decode().split()
+    #     data_list[0] = msg
+    #     if data_list[1] == 'No':
+    #         num_failure += 1
+    #         if num_failure < 3:
+    #             write_msg(last_msg[data_list[0]])   # 重发上一条同类信息
+    #         else:
+    #             # ???通知用户服务器拒绝访问
+    #     else:
+    #         num_failure = 0
+    #         if msg == 'list':
+    #             file_num = int(data_list[1])
+    #             file_list = data_list[2:]
+    #             # ???传回file_num, file_list
+    #         if msg == 'end':
+    #             # ???结束
 
-    async def process_msg(msg_queue):
-        while True:
-            msg = await msg_queue.get()
-            msg = msg.split()
-            if msg['type'] == 'list':
-                client.write_msg('list')
-            elif msg['type'] == 'file':
-                client.write_msg(('file ' + msg['filename']))
-            elif msg['type'] == 'continue':
-                client.write_msg('continue')
-            elif msg['type'] == 'pause':
-                client.write_msg(('pause')
-            elif msg['type'] == 'end':
-                client.write_msg('end')
-            elif msg['type'] == 'seek':
-                client.write_msg(('seek ' + msg[1]))
+    async def write_msg(msg):
+        if msg['type'] == 'list':
+            v_writer.write('list')
+        elif msg['type'] == 'file':
+            v_writer.write(('file ' + msg['filename']))
+        elif msg['type'] == 'continue':
+            v_writer.write('continue')
+        elif msg['type'] == 'pause':
+            v_writer.write(('pause')
+        elif msg['type'] == 'end':
+            v_writer.write('end')
+        elif msg['type'] == 'seek':
+            v_writer.write(('seek ' + msg[1]))
+        last_msg[msg['type']] = msg
+        await readline()
 
-    loop=asyncio.get_event_loop()
-    tasks=[
-            process_msg(msg_queue)
-    ]
-    loop.run_forever()
+    
 
 
 
