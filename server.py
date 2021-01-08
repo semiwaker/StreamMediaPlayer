@@ -16,11 +16,11 @@ async def response(reader, writer):
         blocks = msg.split(' ')
         a = blocks[0]
         if(a == 'list'):
-            message = os.listdir('.')
+            message = os.listdir('./media')
             writer.writelines(message)
         elif(a == 'file'):
             try:
-                os.chdir(blocks[1])
+                os.chdir(['./media/',blocks[1]])
             except OSError:
                 writer.writelines('no') 
             videolist = os.listdir()
