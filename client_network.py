@@ -17,20 +17,26 @@ async def client_network_main(msg_queue, buffer):
     host = socket.gethostname()
     port = 23333
 
+    reading = True
+
         # local_server = ServerProtocol(loop, buffer)
         # client = ClientProtocol(loop, buffer, host, port)
 
         # async def server_main(local_server, loop, buffer):
         #     await loop.create_server(local_server, host, port)
     async def response(reader, writer):
-        while True:
-            data = reader.read()
-            data = struct.unpack(data.decode())
-            self.buffer.insert(data[0], data[1])
+        while reading:
+            data = reader.readexactly(64)
+            length, seq = struct.unpack("2i", data)
+            file = reader.readexactly(length)
+            buffer.insert(seq, file)
             # 如果buffer快满了，通知server
-            writer.write(data[1].encode())
+            writer.write(seq[1].encode())
+            await writer.drain()
             if(len(buffer.buf) > 0.8 * buffer.max_size):
                 writer.write('pause'.encode())
+                await writer.drain()
+                await process_msg()
 
     await asyncio.start_server(response, host, port)
 
@@ -39,7 +45,7 @@ async def client_network_main(msg_queue, buffer):
 
     v_reader, v_writer = await asyncio.open_connection(v_server_host, v_server_port)
     buffer.set_writer(v_writer)
-    burrer.set_reader(v_reader)
+    buffer.set_reader(v_reader)
     v_writer.write('%s  %d' % (host, port).encode())
     # process msg
     while True:
@@ -78,10 +84,10 @@ async def client_network_main(msg_queue, buffer):
             v_writer.write('end')
         elif msg['type'] == 'seek':
             v_writer.write(('seek ' + msg[1]))
-        last_msg[msg['type']] = msg
+        last_msg[msg['type']]=msg
         await readline()
 
-    
+
 
 
 

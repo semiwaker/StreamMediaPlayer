@@ -20,12 +20,12 @@ class MediaBuffer:
     def set_writer(self, writer):
         self.writer = writer
 
-    def set_reader(reader):
+    def set_reader(self, reader):
         self.reader = reader
 
     async def get_file_names(self):
-        writer.write('list')
-        line = await reader.readline()
+        self.writer.write('list')
+        line = await self.reader.readline()
         return line[1:]
 
     def set_name(self, file_name):
@@ -34,14 +34,12 @@ class MediaBuffer:
     async def open(self):
         cnt = 0
         while cnt < 3:
-            writer.write('file %s' % (self.file_name))
-            msg = async reader.readline()
+            self.writer.write('file %s' % (self.file_name))
+            msg = await self.reader.readline()
             if msg == 'No':
                 cnt += 1
             elif msg == 'ok':
                 return
-        
-        
 
     def insert(self, seq, data):
         with self.buf_lock:
