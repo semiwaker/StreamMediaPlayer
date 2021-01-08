@@ -24,8 +24,8 @@ class MediaBuffer:
         self.reader = reader
 
     async def get_file_names(self):
-        writer.write('file')
-        line = async reader.readline()
+        writer.write('list')
+        line = await reader.readline()
         return line[1:]
 
     def set_name(self, file_name):
