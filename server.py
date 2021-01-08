@@ -1,29 +1,38 @@
 import asyncio
 import file_transfer
 import os
-global openfile
-global filelength
-async def response(quest):
-    reader, writer = await asyncio.open_connection(
-        '127.0.0.1', 8888)
-    a = quest[0]
-    if(a == 'list'):       
+
+
+async def server_main():
+    await asyncio.start_server(response, "127.0.0.1", 8888)
+
+
+async def response(reader, writer):
+    while True:
+        msg = await reader.readline()
+        # TODO:
+        blocks = msg.split(' ')
+        a = blocks[0]
+    if(a == 'list'):
         message = os.listdir('.')
     elif(a == 'file'):
         cap = cv2.VideoCapture(quest[1])
         if cap.isOpened():
-            frames_num=cap.get(7)
-            message = ['ok',frames_num]
+            frames_num = cap.get(7)
+            message = ['ok', frames_num]
             transfer_video(cap)
         else:
             message = 'no'
     elif(a == 'continue')
-        return 'ok'
+    return 'ok'
     elif(a == 'pause')
-        t = quest[1]
-        return 'ok'
+    t = quest[1]
+    return 'ok'
     elif(a == 'end')
-        return 'ok'
+    return 'ok'
     elif(a == 'seek')
-        t = quest[1]
-        return 'ok'
+    t = quest[1]
+    return 'ok'
+
+if __name__ == "__main__":
+    asyncio.run(server_main())

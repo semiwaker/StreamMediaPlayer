@@ -42,14 +42,12 @@ async def client_network_main(msg_queue, buffer):
             # elif msg[0] == 'seek':
             #     client.write_msg(('seek ' + msg[1]))
             client.write_msg(msg)
-        loop = asyncio.get_event_loop()
         tasks=[
             server_main(local_server, loop, buffer), 
             client_main(client, v_server_host, v_server_port, loop, buffer),
             process_msg(msg_queue)
         ]
-        loop.run_until_complete(tasks)
-        loop.run_forever()
+        await asyncio.gather(tasks)
 
 
 
