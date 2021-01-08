@@ -32,8 +32,16 @@ class MediaBuffer:
         self.file_name = file_name
 
     async def open(self):
-        writer.write('file %s' % (self.file_name))
-        pass
+        cnt = 0
+        while cnt < 3:
+            writer.write('file %s' % (self.file_name))
+            msg = async reader.readline()
+            if msg == 'No':
+                cnt += 1
+            elif msg == 'ok':
+                return
+        
+        
 
     def insert(self, seq, data):
         with self.buf_lock:
