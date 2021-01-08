@@ -12,6 +12,7 @@ class MediaBuffer:
         self.file_name = ""
         self.fetch_size = 8
         self.write = None
+        self.reader = None
 
         self.buf_lock = threading.Lock()
         self.cv = threading.Condition(self.buf_lock)
@@ -19,14 +20,19 @@ class MediaBuffer:
     def set_writer(writer):
         self.writer = writer
 
+    def set_reader(reader):
+        self.reader = reader
+
     async def get_file_names(self):
-        return [""]
+        writer.write('file')
+        line = async reader.readline()
+        return line[1:]
 
     def set_name(self, file_name):
         self.file_name = file_name
 
     async def open(self):
-        # TODO: send open
+        writer.write('file %s' % (self.file_name))
         pass
 
     def insert(self, seq, data):

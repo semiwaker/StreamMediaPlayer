@@ -39,6 +39,7 @@ async def client_network_main(msg_queue, buffer):
 
     v_reader, v_writer = await asyncio.open_connection(v_server_host, v_server_port)
     buffer.set_writer(v_writer)
+    burrer.set_reader(v_reader)
     v_writer.write('%s  %d' % (host, port).encode())
 
     async def process_msg():
