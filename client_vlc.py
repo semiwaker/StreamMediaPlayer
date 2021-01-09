@@ -2,22 +2,44 @@ import asyncio
 # from asyncio.events import get_event_loop
 import ctypes
 import sys
+import time
 
 import vlc
 import wx
 from wxasync import AsyncBind, WxAsyncApp, StartCoroutine
 
+# from client_utility import MediaBuffer
+
+
+def get_media_buffer(opaque):
+    failed = True
+    cnt = 0
+    while failed:
+        try:
+            media_buffer = \
+                ctypes.cast(opaque, ctypes.POINTER(ctypes.py_object))\
+                .contents.value
+            failed = False
+        except ValueError:
+            print("failed")
+            cnt += 1
+            if cnt > 10:
+                break
+            failed = True
+            # time.sleep(0.1)
+    return media_buffer
+
 
 @vlc.CallbackDecorators.MediaOpenCb
 def media_open_cb(opaque, data_pointer, size_pointer):
-    print("OPEN", opaque, data_pointer, size_pointer)
+    # print("OPEN", opaque, data_pointer, size_pointer)
 
-    buffer = \
-        ctypes.cast(opaque, ctypes.POINTER(ctypes.py_object)).contents.value
+    buffer = get_media_buffer(opaque)
+    print(buffer)
 
     # buffer.open()
 
-    data_pointer.contents.value = buffer
+    data_pointer.contents.value = opaque
     size_pointer.value = 1 ** 64 - 1
 
     return 0
@@ -25,46 +47,42 @@ def media_open_cb(opaque, data_pointer, size_pointer):
 
 @vlc.CallbackDecorators.MediaReadCb
 def media_read_cb(opaque, buffer, length):
-    print("READ", opaque, buffer, length)
+    # print("READ", opaque, buffer, length)
 
-    media_buffer = \
-        ctypes.cast(opaque, ctypes.POINTER(ctypes.py_object)).contents.value
+    media_buffer = get_media_buffer(opaque)
 
-    new_data = media_buffer.fetch()
+    new_data = media_buffer.fetch(length)
     bytes_read = len(new_data)
+    # print("bytes_read", bytes_read)
 
-    if bytes_read > 0:
-        buffer_array = ctypes.cast(
-            buffer,
-            ctypes.POINTER(ctypes.c_char * bytes_read)
-        )
-        for index, b in enumerate(new_data):
-            buffer_array.contents[index] = ctypes.c_char(b)
+    if bytes_read > -1:
+        # buffer_array = ctypes.cast(
+        #     buffer,
+        #     ctypes.POINTER(ctypes.c_char * bytes_read)
+        # )
+        ctypes.memmove(buffer, new_data, bytes_read)
+        # for index, b in enumerate(new_data):
+        # buffer_array.contents[index] = ctypes.c_char(b)
 
-    # print(f"just read f{bytes_read}B")
+    # print(f"Just read f{bytes_read}B")
     return bytes_read
 
 
 @vlc.CallbackDecorators.MediaSeekCb
 def media_seek_cb(opaque, offset):
-    print("SEEK", opaque, offset)
+    # print("SEEK", opaque, offset)
 
-    media_buffer = ctypes.cast(
-        opaque, ctypes.POINTER(ctypes.py_object)).contents.value
+    media_buffer = get_media_buffer(opaque)
 
     media_buffer.seek(offset)
 
-    return 0
+    return -1
 
 
 @vlc.CallbackDecorators.MediaCloseCb
 def media_close_cb(opaque):
-    print("CLOSE", opaque)
-
-    media_buffer = ctypes.cast(
-        opaque, ctypes.POINTER(ctypes.py_object)).contents.value
-
-    media_buffer.close()
+    pass
+    # print("CLOSE", opaque)
 
 
 class Player(wx.Frame):
@@ -80,11 +98,12 @@ class Player(wx.Frame):
 
         self.running = True
         self.playing = False
+        self.selected = False
         # Menu Bar
         #   File Menu
         self.frame_menubar = wx.MenuBar()
         self.file_menu = wx.Menu()
-        self.file_menu.Append(1, "&Open", "Open distant file")
+        self.menu_open = self.file_menu.Append(1, "&Open", "Open distant file")
         # self.file_menu.AppendSeparator()
         # self.file_menu.Append(2, "&Close", "Quit")
         self.frame_menubar.Append(self.file_menu, "File")
@@ -163,6 +182,10 @@ class Player(wx.Frame):
         # if a file is already running, then stop it.
         await self.OnStop(None)
 
+        self.menu_open.Enable(False)
+        self.play.Disable()
+        self.stop.Disable()
+        self.pause.Disable()
         choices = await self.buffer.get_file_names()
         dialog = wx.SingleChoiceDialog(
             self,
@@ -171,12 +194,21 @@ class Player(wx.Frame):
             choices
         )
 
+        self.menu_open.Enable(True)
+        # self.play.Enable()
+        self.stop.Enable()
+        self.pause.Enable()
+
         if wx.ID_OK == dialog.ShowModal():
+            self.selected = True
             file_name = dialog.GetStringSelection()
             self.buffer.set_name(file_name)
             await self.buffer.open()
+
             buffer_obj = ctypes.py_object(self.buffer)
-            buffer_ptr = ctypes.byref(buffer_obj)
+            buffer_ptr = ctypes.cast(
+                ctypes.pointer(buffer_obj), ctypes.c_void_p)
+            # print(buffer_ptr)
             self.media = self.Instance.media_new_callbacks(
                 media_open_cb,
                 media_read_cb,
@@ -185,11 +217,11 @@ class Player(wx.Frame):
                 buffer_ptr
             )
             self.player.set_media(self.media)
-            title = self.player.get_title()
-            # if an error was encountred while retrieving the title,
-            # otherwise use filename
-            self.SetTitle("%s - %s" %
-                          (title if title != -1 else 'wxVLC', file_name))
+            # title = self.player.get_title()
+            # # if an error was encountred while retrieving the title,
+            # # otherwise use filename
+            # self.SetTitle("%s - %s" %
+            #               (title if title != -1 else 'wxVLC', file_name))
 
             # set the window id where to render VLC's video output
             handle = self.videopanel.GetHandle()
@@ -200,8 +232,13 @@ class Player(wx.Frame):
                 self.player.set_hwnd(handle)
             elif sys.platform == "darwin":  # for MacOS
                 self.player.set_nsobject(handle)
+            await asyncio.sleep(0.5)
             await self.OnPlay(None)
             self.volslider.SetValue(self.player.audio_get_volume() / 2)
+
+    async def WaitEOF(self):
+        await self.buffer.eof.wait()
+        await self.OnStop(None)
 
     async def OnPlay(self, evt):
         """Toggle the status to Play/Pause.
@@ -210,8 +247,9 @@ class Player(wx.Frame):
         print("Play")
         # check if there is a file to play, otherwise open a
         # wx.FileDialog to select a file
-        if not self.player.get_media():
+        if not self.selected:
             await self.OnOpen(None)
+            return
             # Try to launch the media, if this fails display an error message
         elif self.player.play():  # == -1:
             self.errorDialog("Unable to play.")
@@ -224,7 +262,8 @@ class Player(wx.Frame):
             self.play.Disable()
             self.pause.Enable()
             self.stop.Enable()
-            await self.msg_queue.put({"type": "play"})
+            asyncio.create_task(self.WaitEOF())
+            # await self.msg_queue.put({"type": "play"})
 
     async def OnPause(self, evt):
         """Pause the player.
@@ -237,14 +276,20 @@ class Player(wx.Frame):
         #     self.play.Disable()
         #     self.pause.Enable()
         self.player.pause()
-        await self.msg_queue.put({"type": "pause"})
+        # await self.msg_queue.put({"type": "pause"})
 
     async def OnStop(self, evt):
         """Stop the player.
         """
         print("Stop")
+        if not self.playing:
+            return
         self.playing = False
+        self.selected = False
         self.player.stop()
+        # self.player.release()
+        self.media.release()
+        self.buffer.close()
         # reset the time slider
         self.timeslider.SetValue(0)
         self.play.Enable()
@@ -262,10 +307,11 @@ class Player(wx.Frame):
                 self.timeslider.SetRange(-1, length)
 
                 # update the time on the slider
-                time = self.player.get_time()
-                self.timeslider.SetValue(time)
+                t = self.player.get_time()
+                self.timeslider.SetValue(t)
 
             await asyncio.sleep(0.1)
+        # pass
 
     async def OnMute(self, evt):
         """Mute/Unmute according to the audio button.

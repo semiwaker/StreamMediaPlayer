@@ -2,160 +2,89 @@ import asyncio
 import socket
 import struct
 
-from client_utility import MediaBuffer
+# from client_utility import MediaBuffer
 
 
 async def client_network_main(msg_queue, buffer):
+    print("client_network_main")
     # msg_queue: asyncio.Queue()
     # buffer: MediaBuffer
 
-    num_failure = 0
-    self.last_msg = {'list': None, 'file': None,
-        'continue': None, 'pause': None, 'end': None, 'seek': None}
+    # num_failure = 0
+    # self.last_msg = {'list': None, 'file': None,
+    # 'continue': None, 'pause': None, 'end': None, 'seek': None}
 
-    s = socket.socket()
+    # s = socket.socket()
+
     host = socket.gethostname()
     port = 23333
+    buffer.set_host_port(host, port)
 
-    reading = True
+    # local_server = ServerProtocol(loop, buffer)
+    # client = ClientProtocol(loop, buffer, host, port)
 
-        # local_server = ServerProtocol(loop, buffer)
-        # client = ClientProtocol(loop, buffer, host, port)
+    # async def server_main(local_server, loop, buffer):
+    #     await loop.create_server(local_server, host, port)
 
-        # async def server_main(local_server, loop, buffer):
-        #     await loop.create_server(local_server, host, port)
-    async def response(reader, writer):
-        while reading:
-            data = reader.readexactly(64)
-            length, seq = struct.unpack("2i", data)
-            file = reader.readexactly(length)
-            buffer.insert(seq, file)
-            # 如果buffer快满了，通知server
-            writer.write(seq[1].encode())
-            await writer.drain()
-            if(len(buffer.buf) > 0.8 * buffer.max_size):
-                writer.write('pause'.encode())
-                await writer.drain()
-                await process_msg()
+    v_server_host = '127.0.0.1'
+    v_server_port = 8888
 
-    await asyncio.start_server(response, host, port)
-
-    v_server_host = '远程服务器hostname'
-    v_server_port = 12345
-
-    v_reader, v_writer = await asyncio.open_connection(v_server_host, v_server_port)
+    v_reader, v_writer = await asyncio.open_connection(
+        v_server_host,
+        v_server_port
+    )
+    print("Connected")
     buffer.set_writer(v_writer)
     buffer.set_reader(v_reader)
-    v_writer.write('%s  %d' % (host, port).encode())
-    # process msg
+
+    async def check_continue(reader, writer):
+        while buffer.reading:
+            if buffer.paused and len(buffer.buf) <= 0.8 * buffer.max_size:
+                async with buffer.wr_lock:
+                    v_writer.write(b'continue\n')
+                    await v_writer.drain()
+                    await v_reader.readline()
+            else:
+                await asyncio.sleep(1)
+
+    async def response(reader, writer):
+        asyncio.create_task(check_continue(reader, writer))
+        while buffer.reading:
+            data = await reader.readexactly(8)
+            length, seq = struct.unpack("2i", data)
+            print("Recived", seq, length)
+            fdata = await reader.readexactly(length)
+            buffer.insert(seq, fdata)
+            # 如果buffer快满了，通知server
+            writer.write(bytes(str(seq) + '\n', encoding='utf-8'))
+            await writer.drain()
+            if len(buffer.buf) > 0.8 * buffer.max_size:
+                buffer.paused = True
+                async with buffer.wr_lock:
+                    v_writer.write(b'pause\n')
+                    await v_writer.drain()
+                    await v_reader.readline()
+
+    asyncio.create_task(asyncio.start_server(response, host, port))
+
     while True:
+        await buffer.playing.wait()
         msg = await msg_queue.get()
-        write_msg(msg)
-
-    # async def process_server_msg():
-    #     msg = await v_reader.readline()
-    #     data_list = data.decode().split()
-    #     data_list[0] = msg
-    #     if data_list[1] == 'No':
-    #         num_failure += 1
-    #         if num_failure < 3:
-    #             write_msg(last_msg[data_list[0]])   # 重发上一条同类信息
-    #         else:
-    #             # ???通知用户服务器拒绝访问
-    #     else:
-    #         num_failure = 0
-    #         if msg == 'list':
-    #             file_num = int(data_list[1])
-    #             file_list = data_list[2:]
-    #             # ???传回file_num, file_list
-    #         if msg == 'end':
-    #             # ???结束
-
-    async def write_msg(msg):
-        if msg['type'] == 'list':
-            v_writer.write('list')
-        elif msg['type'] == 'file':
-            v_writer.write(('file ' + msg['filename']))
-        elif msg['type'] == 'continue':
-            v_writer.write('continue')
-        elif msg['type'] == 'pause':
-            v_writer.write(('pause')
-        elif msg['type'] == 'end':
-            v_writer.write('end')
-        elif msg['type'] == 'seek':
-            v_writer.write(('seek ' + msg[1]))
-        last_msg[msg['type']]=msg
-        await readline()
-
-
-
-
-
-
-# class ClientProtocol(asyncio.Protocol):
-#     def __init__(self, loop, buffer, l_server_host, l_server_port):
-#         self.loop = loop
-#         self.buffer = buffer
-#         self.transport = None
-#         self.num_failure = 0
-#         self.l_server_host = l_server_host
-#         self.l_server_port = l_server_port
-#         self.last_msg = {'list' : None, 'file' : None, 'continue' : None, 'pause' : None, 'end' : None, 'seek' : None}
-
-#     def connection_made(self, transport):
-#         self.transport = transport
-#         transport.write()
-
-
-#     def data_received(self, data):
-#         data_list = data.decode().split()
-#         data_list[0] = msg
-#         if data_list[1] == 'No':
-#             self.num_failure += 1
-#             if self.num_failure < 3:
-#                 self.write_msg(last_msg[data_list[0]])   # 重发上一条同类信息
-#             else:
-#                 # ???通知用户服务器拒绝访问
-#         else:
-#             self.num_failure = 0
-#             if msg == 'list':
-#                 file_num = int(data_list[1])
-#                 file_list = data_list[2:]
-#                 # ???传回file_num, file_list
-#             elif msg == 'end':
-#                 self.loop.stop()
-#                 # ???结束
-
-#     def connection_lost(self, exc):
-#         # ???是否要通知
-#         self.loop.stop()
-
-#     def write_msg(msg):
-#         if msg == None:
-#             return False
-#         transport.write(msg.encode())
-#         msg_list = msg.split()
-#         self.last_msg[msg_list[0]] = msg
-#         return True
-
-# class ServerProtocol(asyncio.Protocol):
-#     def __init__(self, loop, buffer):
-#         self.loop = loop
-#         self.buffer = buffer
-#         self.transport = transport
-
-#     def connection_made(self, transport):
-#         peername = transport.get_extra_info('peername')
-#         print('Connection from {}'.format(peername))
-#         self.transport = transport
-
-#     def data_received(self, data):
-#         # ???数据处理
-#         self.buffer.insert(data.timestamp, data.data)
-#         # 如果buffer快满了，通知server
-#         if(len(buffer.buf) > 0.8 * buffer.max_size):
-#             self.transport.write('pause'.encode())
-
-#     def connection_lost(self, exc):
-#         # ???是否要通知
-#         self.loop.stop()
+        # print("Msg:", msg)
+        # if msg['type'] == 'play':
+        #     v_writer.write(b'continue\n')
+        #     await v_writer.drain()
+        #     await v_reader.readline()
+        # elif msg['type'] == 'pause':
+        #     v_writer.write(b'pause\n')
+        #     await v_writer.drain()
+        #     await v_reader.readline()
+        if msg['type'] == 'stop':
+            print("Stop")
+            buffer.reading = False
+            async with buffer.wr_lock:
+                v_writer.write(b'end\n')
+                await v_writer.drain()
+                await v_reader.readline()
+        # elif msg['type'] == 'seek':
+            # v_writer.write(bytes('seek ' + msg[1] + '\n', encoding='utf-8'))
