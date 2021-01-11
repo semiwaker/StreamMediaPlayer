@@ -68,6 +68,7 @@ async def response(reader, writer):
             writer.write(b'ok\n')
             await writer.drain()
         print("Replied")
+    print("Disconnected")
 
 
 async def file_transfer(p, videolist, reader2, writer2, status):

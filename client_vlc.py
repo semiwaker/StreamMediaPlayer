@@ -104,6 +104,7 @@ class Player(wx.Frame):
         self.frame_menubar = wx.MenuBar()
         self.file_menu = wx.Menu()
         self.menu_open = self.file_menu.Append(1, "&Open", "Open distant file")
+        self.menu_open.Enable(False)
         # self.file_menu.AppendSeparator()
         # self.file_menu.Append(2, "&Close", "Quit")
         self.frame_menubar.Append(self.file_menu, "File")
@@ -123,6 +124,7 @@ class Player(wx.Frame):
         self.pause = wx.Button(ctrlpanel, label="Pause")
         self.pause.Disable()
         self.play = wx.Button(ctrlpanel, label="Play")
+        self.play.Disable()
         self.stop = wx.Button(ctrlpanel, label="Stop")
         self.stop.Disable()
         self.mute = wx.Button(ctrlpanel, label="Mute")
@@ -160,13 +162,35 @@ class Player(wx.Frame):
         self.SetMinSize((350, 300))
 
         # finally create the timer, which updates the timeslider
-        StartCoroutine(self.OnTimer, self)
+        # StartCoroutine(self.OnTimer, self)
 
         # VLC player controls
         self.Instance = vlc.Instance()
         self.player = self.Instance.media_player_new()
 
         print("Created")
+
+        StartCoroutine(self.WaitConnection, self)
+
+    async def WaitConnection(self):
+        dialog = wx.ProgressDialog(
+            "Waiting",
+            "Connecting to server...",
+            parent=self,
+            style=wx.PD_CAN_ABORT | wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+        )
+        # value = 0
+        dialog.Pulse()
+        while not self.buffer.connected:
+            if dialog.WasCancelled() or dialog.WasSkipped():
+                self.Destroy()
+            # if value < 99:
+                # value += 1
+            # dialog.Update(value)
+            await asyncio.sleep(0.1)
+        dialog.Update(100)
+        self.play.Enable()
+        self.menu_open.Enable()
 
     async def OnExit(self, evt):
         """Closes the window.

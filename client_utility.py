@@ -25,6 +25,7 @@ class MediaBuffer:
         self.reading = True
         self.playing = asyncio.Event()
         self.eof = asyncio.Event()
+        self.connected = False
 
         self.host = None
         self.port = None

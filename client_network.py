@@ -29,11 +29,20 @@ async def client_network_main(msg_queue, buffer, server_ip, server_port):
     v_server_host = server_ip
     v_server_port = server_port
 
-    v_reader, v_writer = await asyncio.open_connection(
-        v_server_host,
-        v_server_port
-    )
+    connected = False
+    while not connected:
+        try:
+            v_reader, v_writer = await asyncio.open_connection(
+                v_server_host,
+                v_server_port
+            )
+            connected = True
+        except OSError as e:
+            print(e)
+            await asyncio.sleep(0.1)
+
     print("Connected")
+    buffer.connected = True
     buffer.set_writer(v_writer)
     buffer.set_reader(v_reader)
 
