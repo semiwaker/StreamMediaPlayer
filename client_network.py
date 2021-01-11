@@ -5,7 +5,7 @@ import struct
 # from client_utility import MediaBuffer
 
 
-async def client_network_main(msg_queue, buffer):
+async def client_network_main(msg_queue, buffer, server_ip, server_port):
     print("client_network_main")
     # msg_queue: asyncio.Queue()
     # buffer: MediaBuffer
@@ -26,8 +26,8 @@ async def client_network_main(msg_queue, buffer):
     # async def server_main(local_server, loop, buffer):
     #     await loop.create_server(local_server, host, port)
 
-    v_server_host = '127.0.0.1'
-    v_server_port = 8888
+    v_server_host = server_ip
+    v_server_port = server_port
 
     v_reader, v_writer = await asyncio.open_connection(
         v_server_host,
@@ -44,6 +44,7 @@ async def client_network_main(msg_queue, buffer):
                     v_writer.write(b'continue\n')
                     await v_writer.drain()
                     await v_reader.readline()
+                    buffer.paused = False
             else:
                 await asyncio.sleep(1)
 
@@ -58,12 +59,12 @@ async def client_network_main(msg_queue, buffer):
             # 如果buffer快满了，通知server
             writer.write(bytes(str(seq) + '\n', encoding='utf-8'))
             await writer.drain()
-            if len(buffer.buf) > 0.8 * buffer.max_size:
-                buffer.paused = True
+            if len(buffer.buf) > buffer.max_size:
                 async with buffer.wr_lock:
                     v_writer.write(b'pause\n')
                     await v_writer.drain()
                     await v_reader.readline()
+                    buffer.paused = True
 
     asyncio.create_task(asyncio.start_server(response, host, port))
 

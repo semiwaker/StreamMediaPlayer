@@ -11,7 +11,7 @@ class MediaBuffer:
         self.max_size = max_size
         self.file_name = ""
         self.fetch_size = fetch_size
-        self.retain_size = 8
+        self.retain_size = 4
         self.writer = None
         self.reader = None
         self.wr_lock = asyncio.Lock()

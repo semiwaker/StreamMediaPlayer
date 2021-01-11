@@ -118,8 +118,8 @@ class Player(wx.Frame):
 
         # The second panel holds controls
         ctrlpanel = wx.Panel(self, -1)
-        self.timeslider = wx.Slider(ctrlpanel, -1, 0, 0, 1000)
-        self.timeslider.SetRange(0, 1000)
+        # self.timeslider = wx.Slider(ctrlpanel, -1, 0, 0, 1000)
+        # self.timeslider.SetRange(0, 1000)
         self.pause = wx.Button(ctrlpanel, label="Pause")
         self.pause.Disable()
         self.play = wx.Button(ctrlpanel, label="Play")
@@ -140,7 +140,7 @@ class Player(wx.Frame):
         box1 = wx.BoxSizer(wx.HORIZONTAL)
         box2 = wx.BoxSizer(wx.HORIZONTAL)
         # box1 contains the timeslider
-        box1.Add(self.timeslider, 1)
+        # box1.Add(self.timeslider, 1)
         # box2 contains some buttons and the volume controls
         box2.Add(self.play, flag=wx.RIGHT, border=5)
         box2.Add(self.pause)
@@ -291,7 +291,7 @@ class Player(wx.Frame):
         self.media.release()
         self.buffer.close()
         # reset the time slider
-        self.timeslider.SetValue(0)
+        # self.timeslider.SetValue(0)
         self.play.Enable()
         self.pause.Disable()
         self.stop.Disable()
@@ -300,18 +300,18 @@ class Player(wx.Frame):
     async def OnTimer(self):
         """Update the time slider according to the current movie time.
         """
-        print("Timer")
-        while self.running:
-            if self.playing:
-                length = self.player.get_length()
-                self.timeslider.SetRange(-1, length)
+        # print("Timer")
+        # while self.running:
+        #     if self.playing:
+        #         length = self.player.get_length()
+        #         self.timeslider.SetRange(-1, length)
 
-                # update the time on the slider
-                t = self.player.get_time()
-                self.timeslider.SetValue(t)
+        #         # update the time on the slider
+        #         t = self.player.get_time()
+        #         self.timeslider.SetValue(t)
 
-            await asyncio.sleep(0.1)
-        # pass
+        #     await asyncio.sleep(0.1)
+        pass
 
     async def OnMute(self, evt):
         """Mute/Unmute according to the audio button.
@@ -342,10 +342,10 @@ class Player(wx.Frame):
         edialog.ShowModal()
 
 
-def createWindow(msg_queue, buffer, client_network_main):
+def createWindow(msg_queue, buffer, client_network_main, ip, port):
     print("Creating Window")
     loop = asyncio.get_event_loop()
-    loop.create_task(client_network_main(msg_queue, buffer))
+    loop.create_task(client_network_main(msg_queue, buffer, ip, port))
     app = WxAsyncApp()
     player = Player("Stream Media Player", buffer, msg_queue)
     player.Show()
