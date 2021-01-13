@@ -375,5 +375,5 @@ def createWindow(msg_queue, buffer, client_network_main, ip, port):
     player.Show()
     app.SetTopWindow(player)
     print("Running")
-    loop.set_debug(True)
+    # loop.set_debug(True)
     loop.run_until_complete(app.MainLoop())

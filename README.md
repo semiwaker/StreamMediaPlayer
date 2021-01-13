@@ -8,9 +8,9 @@ python-vlc
 
 ## run
 
-add libvlc.dll into system path.
+install VLC-player and add its install directory into system path.
 
-**server**: `python server.py -ip {ip} -port {port}` 
+**server**: `python server.py -ip {ip} -port {port}`
 **client**: `python client_main.py -ip {ip} -port {port}`
 
 ## prepare media

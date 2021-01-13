@@ -83,6 +83,8 @@ class MediaBuffer:
                     break
 
     def insert(self, seq, data):
+        if data is None:
+            return
         with self.cv:
             last_ts = self.buf[-1]['seq']
             if self.buf[-1]['start'] is not None:
